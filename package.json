@@ -1,0 +1,27 @@
+{
+  "name": "binance-trading-pairs",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "frontend",
+      "server"
+    ]
+  },
+  "scripts": {
+    "start": "yarn workspace server start",
+    "dev": "concurrently \"yarn frontend:dev\" \"yarn server:dev\"",
+    "server:dev": "yarn workspace server dev",
+    "frontend:dev": "yarn workspace frontend dev",
+    "build": "yarn workspace frontend build",
+    "test": "echo true;",
+    "coverage": "echo true;",
+    "swagger": "echo true;",
+    "run:redis": "./server.sh"
+  },
+  "dependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

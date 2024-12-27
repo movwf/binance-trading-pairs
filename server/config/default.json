@@ -1,0 +1,11 @@
+{
+  "db": {
+    "redis": {
+      "processCacheChannel": "process-cache"
+    }
+  },
+  "port": 8421,
+  "wsPort": 8422,
+  "jwtSecret": "some-secret",
+  "cookieName": "app_auth"
+}

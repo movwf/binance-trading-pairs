@@ -1,0 +1,14 @@
+{
+  "db": {
+    "postgres": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "",
+      "user": "postgres",
+      "password": "postgres"
+    },
+    "redis": {
+      "url": "redis://localhost:6379/1"
+    }
+  }
+}
