@@ -41,7 +41,15 @@ userRouter.post("/login", async function login(req, res) {
 
   res.status(200).json(true);
 });
-userRouter.get("/logout", async function logout(req, res) {});
+userRouter.get("/logout", async function logout(req, res) {
+  res.cookie(config.cookieName, '', {
+    httpOnly: true,
+    secure: true,
+    sameSite: "strict",
+    maxAge: 0,
+  });
+  res.status(200).json(true);
+});
 userRouter.post("/register", async function register(req, res) {
   const { email, password } = req.body;
 
@@ -62,7 +70,7 @@ userRouter.post("/register", async function register(req, res) {
   try {
     await users.createUser(email, hashedPassword);
 
-    const token = jwt.sign({ email: user.email }, config.jwtSecret, {
+    const token = jwt.sign({ email }, config.jwtSecret, {
       expiresIn: "24h",
     });
 

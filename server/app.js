@@ -61,7 +61,7 @@ wsApp.ws("/ws", {
     if (client.isNew) {
       const userSubscriptions = await subscriptions.findOne(email);
 
-      client.publishPairs(userSubscriptions.pairs);
+      client.publishPairs(userSubscriptions?.pairs || []);
     }
 
     logger.info(`[ws][server]: Subscriber connected: ${email}`);
