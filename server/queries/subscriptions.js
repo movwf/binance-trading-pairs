@@ -22,8 +22,11 @@ async function findOne(email) {
 async function subscribePair(email, pair) {
   const subscriptions = await findOne(email);
 
+  let updatedPairs;
+
   try {
     if (!subscriptions) {
+      updatedPairs = `${pair}`;
       await pgClient("subscriptions").insert({
         user_id: pgClient.raw(
           `(SELECT id FROM users WHERE email = '${email}')`
@@ -34,22 +37,26 @@ async function subscribePair(email, pair) {
       if (subscriptions.pairs.includes(pair)) {
         return true;
       }
+
+      updatedPairs = subscriptions.pairs.concat(pair).join(",");
       await pgClient("subscriptions")
         .update({
-          pairs: subscriptions.pairs.concat(pair).join(","),
+          pairs: updatedPairs,
         })
         .where({ user_id: subscriptions.id });
     }
 
-    return true;
+    return updatedPairs.split(',');
   } catch (error) {
     logger.error(error);
-    return false;
+    return [];
   }
 }
 
 async function unsubscripePair(email, pair) {
   const subscriptions = await findOne(email);
+
+  let updatedPairs;
 
   try {
     if (subscriptions) {
@@ -57,19 +64,20 @@ async function unsubscripePair(email, pair) {
         return true;
       }
 
+      updatedPairs = subscriptions.pairs.filter((p) => p !== pair).join(",");
       const query = pgClient("subscriptions")
         .update({
-          pairs: subscriptions.pairs.filter((p) => p !== pair).join(","),
+          pairs: updatedPairs,
         })
         .where("user_id", "=", subscriptions.id);
 
       await query;
     }
 
-    return true;
+    return updatedPairs.split(',');
   } catch (error) {
     logger.error(error);
-    return false;
+    return [];
   }
 }
 

@@ -7,5 +7,6 @@
   "port": 8421,
   "wsPort": 8422,
   "jwtSecret": "some-secret",
-  "cookieName": "app_auth"
+  "cookieName": "app_auth",
+  "binanceWSAddress": "wss://stream.binance.com:9443/ws"
 }

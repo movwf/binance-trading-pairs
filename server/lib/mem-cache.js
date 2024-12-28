@@ -43,7 +43,7 @@ function get({ key, bypassProcessMemory = true }) {
   return clients.redisClient.get(key).then((result) => JSON.parse(result));
 }
 
-function set({ key, value, bypassProcessMemory = true }) {
+function set({ key, value, bypassProcessMemory = true, ttl }) {
   if (!bypassProcessMemory) {
     const message = {
       action: "set",
@@ -59,7 +59,7 @@ function set({ key, value, bypassProcessMemory = true }) {
     );
   }
 
-  return clients.redisClient.set(key, JSON.stringify(value));
+  return clients.redisClient.set(key, JSON.stringify(value), { PX: ttl });
 }
 
 function del({ key, bypassProcessMemory = true }) {

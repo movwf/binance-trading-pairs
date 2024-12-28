@@ -5,19 +5,20 @@ const uWS = require("uWebSockets.js");
 const WebSocket = require("ws");
 const cors = require("cors");
 
+const logger = require("./lib/logger");
 const config = require("./config");
 
 const { getJWTFromHeader, parseJWT } = require("./helpers/jwt");
+const SubscriptionClient = require("./helpers/subClients");
+const { serializeTickerData } = require("./lib/binance");
+
 const subscriptions = require("./queries/subscriptions");
-const logger = require("./lib/logger");
 
 const healtCheckRouter = require("./controllers/health-check");
-
 const apiRouter = require("./routes");
-const pgClient = require("./clients/postgres");
-const SubscriptionClient = require("./helpers/subClients");
+const path = require("path");
 
-const { port, wsPort } = config;
+const { port, wsPort, binanceWSAddress } = config;
 
 const app = express();
 const wsApp = uWS.App();
@@ -26,11 +27,36 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(cors());
 
-app.use("/", healtCheckRouter);
+app.get("/", (req, res) => {
+  res.redirect("/app/dashboard");
+});
 
+app.get("/app", (req, res) => {
+  res.redirect("/app/dashboard");
+});
+
+app.use((req, res, next) => {
+  if (
+    /(.ico|.js|.css|.jpg|.png|.map)$/i.test(req.path) ||
+    /\/api[\/]?.*/i.test(req.path)
+  ) {
+    return next();
+  }
+
+  res.header("Cache-Control", "private, no-cache, no-store, must-revalidate");
+  res.header("Expires", "-1");
+  res.header("Pragma", "no-cache");
+  res.sendFile(path.join(__dirname, "dist", "index.html"));
+});
+app.use(express.static(path.join(__dirname, "dist")));
+
+app.use("/", healtCheckRouter);
 app.use("/api", apiRouter);
 
-const binanceWs = new WebSocket("wss://stream.binance.com:9443/ws");
+const binanceWs = new WebSocket(binanceWSAddress);
+binanceWs.on("open", () => {
+  logger.info(`[binance-ws][socket]: Connection established.`);
+});
 
 wsApp.ws("/ws", {
   upgrade: (res, req, context) => {
@@ -72,13 +98,52 @@ wsApp.ws("/ws", {
       binanceWs.send(
         JSON.stringify({
           method: "SUBSCRIBE",
-          params: [`${pair.toLowerCase()}@trade`],
+          params: [`${pair.toLowerCase()}@ticker`],
         })
       );
     });
     ws.send("Welcome to BTP WS API vs 1.0.0");
   },
   message: (ws, message, isBinary) => {
+    try {
+      const data = JSON.parse(Buffer.from(message).toString());
+
+      if (data.action) {
+        const pair = data.details.pair;
+        const pairListenersCount = wsApp.numSubscribers(pair);
+
+        switch (data.action) {
+          case "subscribe":
+            if (pairListenersCount === 0) {
+              binanceWs.send(
+                JSON.stringify({
+                  method: "SUBSCRIBE",
+                  params: [`${pair.toLowerCase()}@ticker`],
+                })
+              );
+            }
+
+            ws.subscribe(pair);
+            break;
+
+          case "unsubscribe":
+            if (pairListenersCount === 1) {
+              binanceWs.send(
+                JSON.stringify({
+                  method: "UNSUBSCRIBE",
+                  params: [`${pair.toLowerCase()}@ticker`],
+                })
+              );
+            }
+
+            ws.unsubscribe(pair);
+            break;
+        }
+      }
+    } catch (error) {
+      logger.error(error);
+    }
+
     logger.info(`[ws][server]: Received message: ${message}`);
   },
   close: async (ws, code, message) => {
@@ -91,20 +156,11 @@ wsApp.ws("/ws", {
 binanceWs.on("message", (data) => {
   const message = JSON.parse(data);
 
-  console.log(message.s);
+  const ticker = serializeTickerData(message);
 
-  const ticker = {
-    symbol: message?.s,
-    price: message?.c,
-    high: message?.h,
-    low: message?.l,
-    priceChange: message?.p,
-    priceChangePercent: message?.P,
-    volume: message?.v,
-    timestamp: message?.E,
-  };
-
-  setTimeout(() => wsApp.publish(message.s, JSON.stringify(ticker)), 100);
+  if (ticker.symbol) {
+    wsApp.publish(ticker.symbol, JSON.stringify(ticker));
+  }
 });
 
 wsApp.listen(wsPort, (socket) => {

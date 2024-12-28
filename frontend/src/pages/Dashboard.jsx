@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import Fuse from "fuse.js";
-import moment from "moment";
+import { useContext, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   LineChart,
   Line,
@@ -9,123 +8,81 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import Icons from "../components/Icons";
 
-import tradeServices from "../services/tradeServices";
+import { MarketContext } from "../contexts/MarketContext";
+
+import PairSocket from "../helpers/PairSocket";
+import clsx from "../helpers/clsx";
+
 import subscriptionService from "../services/subscriptionService";
+import tradeServices from "../services/tradeServices";
+import authServices from "../services/authServices";
 
-const EXAMPLE_PAIR_PRICE_DATA = [
-  { time: "22:15", price: 20750 },
-  { time: "22:20", price: 20760 },
-  { time: "22:25", price: 20780 },
-  { time: "22:30", price: 20770 },
-  { time: "22:35", price: 20790 },
-  { time: "22:40", price: 20760 },
-  { time: "22:45", price: 20780 },
-  { time: "22:50", price: 20773 },
-];
+import SelectWithSearch from "../components/dashboard/SelectWithSearch";
+import pairServices from "../services/pairServices";
 
 function Dashboard() {
-  const [isCoinsMenuOpen, showCoins] = useState(false);
-  const [tradingPairs, setTradingPairs] = useState([]);
-  const [searchResults, setSearchResults] = useState([]);
-  const [subscribedCoins, setSubscribedCoins] = useState([]);
-  const [selectedCoin, setSelectedCoin] = useState("BTCUSDT");
-  const [pairData, setPairData] = useState({
-    BTCUSDT: EXAMPLE_PAIR_PRICE_DATA,
-  });
-  const selectRef = useRef(null);
-
-  const fuse = new Fuse(tradingPairs);
-
-  function handleSearch(keyword) {
-    if (keyword === "") {
-      setSearchResults(tradingPairs.map((p) => ({ item: p })));
-    } else {
-      if (!isCoinsMenuOpen) {
-        showCoins(true);
-      }
-
-      const result = fuse.search(keyword);
-
-      setSearchResults(result);
-    }
-  }
-
-  function handleClickOutside(event) {
-    if (selectRef?.current && !selectRef.current?.contains(event.target)) {
-      showCoins(false);
-    }
-  }
+  const navigate = useNavigate();
+  /** @type {React.MutableRefObject<PairSocket | null>} */
+  const socketRef = useRef(null);
+  const {
+    pairInfo,
+    pairData,
+    pairInView,
+    subscribedCoins,
+    updatePairData,
+    updatePairInfo,
+    updateSelectedPair,
+    updateTradingPairs,
+    updateSubscriptionList,
+  } = useContext(MarketContext);
 
   function handleSubscribePair(pair) {
-    subscriptionService.subscribePair(pair).then(() => {
-      window.location.reload();
-    });
-
-    // setSubscribedCoins([
-    //   ...subscribedCoins,
-    //   ...(subscribedCoins.findIndex((c) => c.name === pair) > -1
-    //     ? []
-    //     : [
-    //         {
-    //           name: pair,
-    //           ticker: "XXX",
-    //           value: "$xx,xx.xx",
-    //           change: "0.xx%",
-    //         },
-    //       ]),
-    // ]);
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.subscribePair(pair);
+      subscriptionService.subscribePair(pair).then((res) => {
+        updateSubscriptionList(res.data?.subscriptions);
+      });
+    }
   }
 
   useEffect(() => {
-    const socket = new WebSocket("ws://localhost:8422/ws");
+    authServices.getToken().then((res) => {
+      if (!res.data.token) {
+        // NOTE: This is workaround for document.cookie on http
+        // TODO: Fix it later
+        navigate("/login");
+      } else {
+        socketRef.current = new PairSocket({ updatePairData });
 
-    socket.onmessage = function (m) {
-      const { data } = m;
+        tradeServices.getTradingPairs().then((res) => {
+          updateTradingPairs(res.data);
+        });
 
-      const priceData = JSON.parse(data);
+        subscriptionService.getAllSubscriptions().then((res) => {
+          updateSubscriptionList(res.data?.subscriptions || []);
 
-      if(priceData?.symbol) {
-        console.log(priceData.priceChange)
-
-        setPairData((pData) => ({
-          ...pData,
-          [priceData.symbol]: [
-            ...(pData[priceData.symbol] || []).slice(1),
-            {
-              price: Number(priceData.priceChange).toFixed(2),
-              time: moment(priceData.timestamp).format("HH:mm"),
-            },
-          ],
-        }));
+          pairServices.getPairInfo(res.data?.subscriptions || []).then((r) => {
+            r.data.forEach((pairInfo) => updatePairInfo(pairInfo));
+          });
+        });
       }
-
-    };
-
-    tradeServices.getTradingPairs().then((res) => {
-      setTradingPairs(res.data);
-      setSearchResults(res.data.map((p) => ({ item: p })));
     });
-
-    subscriptionService.getAllSubscriptions().then((res) => {
-      setSubscribedCoins(
-        res.data.subscriptions.map((p) => ({
-          name: p,
-          ticker: "XXX",
-          value: "$xx,xx.xx",
-          change: "-0.xx%",
-        }))
-      );
-    });
-
-    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.addEventListener("mousedown", handleClickOutside);
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sample chart data
+  const isNegative = (num) => num.startsWith("-");
+  const getPriceChange = (pair) =>
+    pairData[pair] ? pairData[pair].at(-1).priceChange : "";
+  const getPriceChangePercent = (pair) =>
+    pairData[pair] ? pairData[pair].at(-1).priceChangePercent : "";
+  const getPriceInFormat = (pair) =>
+    pairData[pair] ? pairData[pair].at(-1).formattedNumber : "";
 
   return (
     <div className="bg-gray-900 text-gray-300 min-h-screen p-4 flex items-center justify-center">
@@ -144,12 +101,20 @@ function Dashboard() {
             <div className="flex justify-between items-center mb-4">
               <div>
                 <div className="text-xl font-bold flex items-center">
-                  {selectedCoin}
+                  {pairInView}
                 </div>
                 <div className="text-3xl font-bold mt-2">
-                  $20,759.71{" "}
-                  <span className="text-red-500 text-sm">
-                    - $20.77 (-0.10%)
+                  {getPriceInFormat(pairInView)}{" "}
+                  <span
+                    className={clsx(
+                      "text-sm",
+                      isNegative(getPriceChange(pairInView))
+                        ? "text-red-500"
+                        : "text-green-500"
+                    )}
+                  >
+                    {getPriceChange(pairInView)} (
+                    {getPriceChangePercent(pairInView)}%)
                   </span>
                 </div>
               </div>
@@ -164,7 +129,7 @@ function Dashboard() {
             {/* Chart Area */}
             <div className="h-40">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={pairData[selectedCoin]}>
+                <LineChart data={pairData[pairInView]}>
                   <XAxis dataKey="time" tick={{ fill: "#ccc", fontSize: 12 }} />
                   <YAxis
                     domain={["auto", "auto"]}
@@ -189,18 +154,26 @@ function Dashboard() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-4 mt-4 text-center">
+            <div className="grid grid-cols-4 gap-2 mt-4 text-center">
               <div>
-                <div className="text-sm">Market cap</div>
-                <div className="font-bold">$1.34M USD</div>
+                <div className="text-sm">High</div>
+                <div className="font-bold">{pairInfo[pairInView]?.high24hr}</div>
+                {/* $1.34M USD */}
               </div>
               <div>
-                <div className="text-sm">Circulating supply</div>
-                <div className="font-bold">$1.34M BTC</div>
+                <div className="text-sm">Low</div>
+                <div className="font-bold">{pairInfo[pairInView]?.low24hr}</div>
+                {/* $1.34M BTC */}
               </div>
               <div>
-                <div className="text-sm">Volume (1h)</div>
-                <div className="font-bold">201M USD</div>
+                <div className="text-sm">Price Change</div>
+                <div className="font-bold">{pairInfo[pairInView]?.priceChange24hr}</div>
+                {/* 201M USD */}
+              </div>
+              <div>
+                <div className="text-sm">Price Change %</div>
+                <div className="font-bold">{pairInfo[pairInView]?.priceChangePercent24hr}</div>
+                {/* 201M USD */}
               </div>
             </div>
           </div>
@@ -214,84 +187,38 @@ function Dashboard() {
               <div className="text-gray-400">1D</div>
               <div className="text-gray-400">7D</div>
             </div> */}
-            <div className="relative h-14 flex justify-between items-center mb-2">
-              <div
-                ref={selectRef}
-                className="relative h-10 w-full bg-gray-600 rounded-lg pr-8 pl-4 cursor-pointer hover:bg-gray-500"
-                onClick={() => {
-                  showCoins(!isCoinsMenuOpen);
-                }}
-              >
-                <input
-                  type="text"
-                  className="w-full h-full bg-transparent outline-none"
-                  onChange={(ev) => {
-                    handleSearch(ev.target.value);
-                  }}
-                />
-                <div className="absolute top-3 right-2 w-4 h-4">
-                  <Icons.Down />
-                </div>
-                {isCoinsMenuOpen && (
-                  <div
-                    className="absolute h-64 w-full flex flex-col overflow-x-hidden hide-scrollbar z-55 top-12 -left-0 bg-gray-900 border border-gray-600 rounded-lg transition-all"
-                    onMouseLeave={() => {
-                      showCoins(false);
-                    }}
-                  >
-                    {searchResults.map((result) => (
-                      <div
-                        key={result.item}
-                        className="border-b border-gray-700"
-                        onClick={() => {
-                          handleSubscribePair(result.item);
-                        }}
-                      >
-                        <div className="h-16 w-full flex justify-between items-center px-4 hover:bg-gray-700">
-                          <div className="flex flex-col">
-                            {result.item}{" "}
-                            <span className="text-gray-500">XXX</span>
-                          </div>
-                          <div
-                            className={`${
-                              Math.random(1) > 0.5
-                                ? "text-green-500"
-                                : "text-red-500"
-                            } flex flex-col items-end`}
-                          >
-                            $11.111.11{" "}
-                            <span className="text-xs">
-                              {Math.random(1) > 0.5 ? "" : "-"}0.XX%
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <SelectWithSearch
+              onPairSelected={(pair) => {
+                handleSubscribePair(pair);
+              }}
+            />
             <div className="max-h-64 overflow-x-scroll">
               {subscribedCoins.map((coin) => (
                 <div
                   key={coin.name}
                   className="h-12 flex justify-between items-center p-2 hover:bg-gray-700 rounded-md transition-all cursor-pointer"
                   onClick={() => {
-                    setSelectedCoin(coin.name);
+                    updateSelectedPair(coin.name);
                   }}
                 >
                   <div>
                     {coin.name}{" "}
                     <span className="text-gray-500">{coin.ticker}</span>
                   </div>
-                  <div
-                    className={`${
-                      parseFloat(coin.change) > 0
-                        ? "text-green-500"
-                        : "text-red-500"
-                    }`}
-                  >
-                    {coin.value} <span className="text-xs">{coin.change}</span>
+                  <div>
+                    <span className="text-green-500">
+                      {getPriceInFormat(coin.name)}
+                    </span>{" "}
+                    <span
+                      className={clsx(
+                        "text-xs",
+                        isNegative(getPriceChangePercent(coin.name))
+                          ? "text-red-500"
+                          : "text-green-500"
+                      )}
+                    >
+                      {getPriceChangePercent(coin.name)}%
+                    </span>
                   </div>
                 </div>
               ))}

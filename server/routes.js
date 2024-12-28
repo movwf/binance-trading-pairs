@@ -1,11 +1,10 @@
 const { Router } = require("express");
 
-const memCache = require("./lib/mem-cache");
 const usersRouter = require("./controllers/users");
+const pairsRouter = require("./controllers/pairs");
 const subscriptionsRouter = require("./controllers/subscriptions");
 
 const validateMiddleware = require("./middlewares/validate");
-const binance = require("./lib/binance");
 
 const apiRouter = Router();
 
@@ -19,11 +18,7 @@ apiRouter.use("/users", usersRouter);
 // Subscriptions
 apiRouter.use("/subscriptions", validateMiddleware, subscriptionsRouter);
 
-// Trade
-apiRouter.get("/pairs/all", async (req, res) => {
-  const pairs = await binance.getTradingPairs();
-
-  res.json(pairs);
-});
+// Pairs
+apiRouter.use("/pairs", pairsRouter);
 
 module.exports = apiRouter;
