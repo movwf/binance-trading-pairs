@@ -1,0 +1,126 @@
+openapi: 3.0.0
+info:
+  title: Trading API
+  description: API documentation for user authentication, subscription management, and trading pairs.
+  version: 1.0.0
+paths:
+  /users/login:
+    post:
+      summary: Login a user
+      description: Authenticate a user and provide a JWT token as a cookie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  example: password123
+      responses:
+        200:
+          description: Successfully logged in.
+        400:
+          description: Missing or incorrect email/password.
+        401:
+          description: Unauthorized.
+  /users/logout:
+    get:
+      summary: Logout a user
+      description: Clears the authentication cookie.
+      responses:
+        200:
+          description: Successfully logged out.
+  /users/register:
+    post:
+      summary: Register a new user
+      description: Create a new user account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: newuser@example.com
+                password:
+                  type: string
+                  example: password123
+      responses:
+        201:
+          description: User registered successfully.
+        400:
+          description: Missing or invalid input or user already exists.
+        500:
+          description: Server error.
+  /users/token:
+    get:
+      summary: Retrieve authentication token
+      description: Returns the JWT token stored in the cookie.
+      responses:
+        200:
+          description: Successfully retrieved token.
+  /subscriptions/all:
+    get:
+      summary: Get all subscriptions
+      description: Retrieve all subscription pairs for the authenticated user.
+      responses:
+        200:
+          description: List of subscriptions.
+  /subscriptions/subscribe:
+    get:
+      summary: Subscribe to a pair
+      description: Subscribe the authenticated user to a trading pair.
+      parameters:
+        - in: query
+          name: pair
+          required: true
+          schema:
+            type: string
+          description: The trading pair to subscribe to.
+      responses:
+        200:
+          description: Successfully subscribed to the pair.
+  /subscriptions/unsubscribe:
+    get:
+      summary: Unsubscribe from a pair
+      description: Unsubscribe the authenticated user from a trading pair.
+      parameters:
+        - in: query
+          name: pair
+          required: true
+          schema:
+            type: string
+          description: The trading pair to unsubscribe from.
+      responses:
+        200:
+          description: Successfully unsubscribed from the pair.
+  /pairs/all:
+    get:
+      summary: Get all trading pairs
+      description: Retrieve all available trading pairs.
+      responses:
+        200:
+          description: List of all trading pairs.
+  /pairs/get:
+    get:
+      summary: Get specific pair(s) info
+      description: Retrieve information about specific trading pair(s).
+      parameters:
+        - in: query
+          name: pair
+          required: true
+          schema:
+            type: string
+          description: Comma-separated list of trading pairs.
+      responses:
+        200:
+          description: Information about the specified trading pair(s).
