@@ -7,7 +7,7 @@ const subscriptionsRouter = Router();
 subscriptionsRouter.get("/all", async (req, res) => {
   const subscriptions = await subscriptionQueries.findOne(req.user.email);
 
-  res.json({ subscriptions: subscriptions.pairs });
+  res.json({ subscriptions: subscriptions?.pairs || [] });
 });
 
 subscriptionsRouter.get("/subscribe", async (req, res) => {

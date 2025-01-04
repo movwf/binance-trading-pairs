@@ -10,6 +10,10 @@
       "server"
     ]
   },
+  "engines":{
+    "node": ">=20.0.0",
+    "yarn": ">=1.22.19"
+  },
   "scripts": {
     "start": "yarn workspace server start",
     "dev": "concurrently \"yarn frontend:dev\" \"yarn server:dev\"",

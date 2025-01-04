@@ -37,13 +37,29 @@ function Dashboard() {
     updateSubscriptionList,
   } = useContext(MarketContext);
 
+  function fetchPairInfo(subscribedPairs) {
+    pairServices.getPairInfo(subscribedPairs).then((r) => {
+      if(r.data?.length) {
+        r.data.forEach((pairInfo) => updatePairInfo(pairInfo));
+      }
+    });
+  }
+
   function handleSubscribePair(pair) {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.subscribePair(pair);
       subscriptionService.subscribePair(pair).then((res) => {
         updateSubscriptionList(res.data?.subscriptions);
+        fetchPairInfo(res.data?.subscriptions || []);
       });
+
     }
+  }
+
+  function handleLogout() {
+    return authServices.logout().then(() => {
+      window.location.href = "/login";
+    });
   }
 
   useEffect(() => {
@@ -62,9 +78,7 @@ function Dashboard() {
         subscriptionService.getAllSubscriptions().then((res) => {
           updateSubscriptionList(res.data?.subscriptions || []);
 
-          pairServices.getPairInfo(res.data?.subscriptions || []).then((r) => {
-            r.data.forEach((pairInfo) => updatePairInfo(pairInfo));
-          });
+          fetchPairInfo(res.data?.subscriptions || []);
         });
       }
     });
@@ -90,7 +104,15 @@ function Dashboard() {
         <div>
           {/* Top Bar */}
           <div className="flex justify-end items-center mb-4 px-4">
-            <div className="text-sm">⚙️ Settings</div>
+            <div className="text-sm hover:bg-gray-500 pl-2 pr-3 py-2 rounded-lg cursor-pointer hover:text-black">
+              ⚙️ Settings
+            </div>
+            <div
+              className="text-sm ml-4 hover:bg-gray-500 pl-2 pr-3 py-2 rounded-lg cursor-pointer hover:text-black"
+              onClick={() => { handleLogout(); }}
+            >
+              🔒 Logout
+            </div>
           </div>
         </div>
 
@@ -157,7 +179,9 @@ function Dashboard() {
             <div className="grid grid-cols-4 gap-2 mt-4 text-center">
               <div>
                 <div className="text-sm">High</div>
-                <div className="font-bold">{pairInfo[pairInView]?.high24hr}</div>
+                <div className="font-bold">
+                  {pairInfo[pairInView]?.high24hr}
+                </div>
                 {/* $1.34M USD */}
               </div>
               <div>
@@ -167,12 +191,16 @@ function Dashboard() {
               </div>
               <div>
                 <div className="text-sm">Price Change</div>
-                <div className="font-bold">{pairInfo[pairInView]?.priceChange24hr}</div>
+                <div className="font-bold">
+                  {pairInfo[pairInView]?.priceChange24hr}
+                </div>
                 {/* 201M USD */}
               </div>
               <div>
                 <div className="text-sm">Price Change %</div>
-                <div className="font-bold">{pairInfo[pairInView]?.priceChangePercent24hr}</div>
+                <div className="font-bold">
+                  {pairInfo[pairInView]?.priceChangePercent24hr}
+                </div>
                 {/* 201M USD */}
               </div>
             </div>

@@ -4,6 +4,10 @@
   "main": "app.js",
   "license": "MIT",
   "private": true,
+  "engines":{
+    "node": ">=20.0.0",
+    "yarn": ">=1.22.19"
+  },
   "scripts": {
     "start": "node --require sucrase/register app.js",
     "dev": "nodemon app.js",

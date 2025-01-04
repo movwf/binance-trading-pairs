@@ -13,11 +13,17 @@ pairsRouter.get("/all", async (req, res) => {
 pairsRouter.get("/get", async (req, res) => {
   const { pair } = req.query;
 
-  const pairs = pair.split(",");
+  const pairs = pair.split(",").filter(Boolean);
 
-  const pairInfo = await binance[pairs ? "getPairsInfo" : "getPairInfo"](
-    pairs.length > 1 ? pairs : pairs[0]
-  );
+  let pairInfo = [];
+
+  if(pairs.length) {
+    if(pairs.length > 1) {
+      pairInfo = await binance.getPairsInfo(pairs);
+    } else {
+      pairInfo = await binance.getPairInfo(pairs[0]);
+    }
+  }
 
   res.json(pairInfo);
 });
