@@ -9,8 +9,7 @@ function SelectWithSearch({ onPairSelected }) {
   const [isCoinsMenuOpen, showCoins] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const selectRef = useRef(null);
-
-  const fuse = new Fuse(tradingPairs);
+  const fuseRef = useRef(null);
 
   function handleSearch(keyword) {
     if (keyword === "") {
@@ -20,9 +19,12 @@ function SelectWithSearch({ onPairSelected }) {
         showCoins(true);
       }
 
-      const result = fuse.search(keyword);
+      if(fuseRef.current) {
+        const result = fuseRef.current?.search(keyword);
+  
+        setSearchResults(result);
+      }
 
-      setSearchResults(result);
     }
   }
 
@@ -41,6 +43,7 @@ function SelectWithSearch({ onPairSelected }) {
 
   useEffect(() => {
     setSearchResults(tradingPairs.map((p) => ({ item: p })));
+    fuseRef.current = new Fuse(tradingPairs || []);
   }, [tradingPairs]);
 
   return (
